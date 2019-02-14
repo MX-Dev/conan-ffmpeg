@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from conans import ConanFile, AutoToolsBuildEnvironment, tools
-import os
 import glob
-import shutil
+import os
 import platform
+import shutil
+
+from conans import ConanFile, AutoToolsBuildEnvironment, tools
 
 
 # noinspection PyUnresolvedReferences
@@ -87,7 +88,7 @@ class FFmpegConan(ConanFile):
                        "securetransport=True",
                        "qsv=True",
                        "mediacodec=True")
-    
+
     @property
     def is_windows_host(self):
         return platform.system() == "Windows"
@@ -99,7 +100,7 @@ class FFmpegConan(ConanFile):
     @property
     def is_mac_host(self):
         return platform.system() == "Darwin"
-    
+
     @property
     def is_mingw_windows(self):
         return self.is_windows_host and self.settings.compiler == 'gcc' and os.name == 'nt'
@@ -114,7 +115,7 @@ class FFmpegConan(ConanFile):
 
     def source(self):
         git = tools.Git(folder="sources")
-        git.clone("https://github.com/MX-Dev/FFmpeg.git", "static_shared")
+        git.clone("https://github.com/MX-Dev/FFmpeg.git", "master")
         if self.is_msvc and self.options.x264 and not self.options['x264'].shared:
             # suppress MSVC linker warnings: https://trac.ffmpeg.org/ticket/7396
             # warning LNK4049: locally defined symbol x264_levels imported
@@ -146,8 +147,6 @@ class FFmpegConan(ConanFile):
 
     def build_requirements(self):
         self.build_requires("yasm_installer/1.3.0@bincrafters/stable")
-        if self.is_android_cross:
-            self.build_requires("android-toolchain/r19@magix/testing")
         if self.is_windows_host:
             self.build_requires("msys2_installer/latest@bincrafters/stable")
 
@@ -261,8 +260,9 @@ class FFmpegConan(ConanFile):
                     # Visual Studio 2013 (and earlier) doesn't support "inline" keyword for C (only for C++)
                     args.append('--extra-cflags=-Dinline=__inline' % self.settings.compiler.runtime)
 
-            if self.settings.arch == 'x86':
-                args.append('--arch=x86')
+            if self.settings.arch == 'x86' or self.is_android_cross:
+                args.append('--arch=%s' % {"armv7": "arm", "armv8": "arm64"}
+                            .get(str(self.settings.arch), str(self.settings.arch)))
 
             args.append('--enable-postproc' if self.options.postproc else '--disable-postproc')
             args.append('--enable-pic' if self.options.fPIC else '--disable-pic')
@@ -320,8 +320,7 @@ class FFmpegConan(ConanFile):
             if self.is_android_cross:
                 args.extend(['--target-os=android',
                              '--enable-cross-compile',
-                             '--enable-jni',
-                             "--cross-prefix=%s" % self.deps_env_info['android-toolchain'].TOOLCHAIN_ROOT])
+                             '--enable-jni'])
             # FIXME disable CUDA and CUVID by default, revisit later
 
             args.extend(['--disable-cuda', '--disable-cuvid'])
@@ -362,11 +361,17 @@ class FFmpegConan(ConanFile):
                     # hack for MSYS2 which doesn't inherit PKG_CONFIG_PATH
                     for filename in ['.bashrc', '.bash_profile', '.profile']:
                         tools.run_in_windows_bash(self, 'cp ~/%s ~/%s.bak' % (filename, filename))
-                        command = 'echo "export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:%s" >> ~/%s'\
+                        command = 'echo "export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:%s" >> ~/%s' \
                                   % (pkg_config_path, filename)
                         tools.run_in_windows_bash(self, command)
 
-                env_build = AutoToolsBuildEnvironment(self, win_bash=self.is_mingw_windows or self.is_msvc)
+                if self.is_android_cross:
+                    env_make = os.getenv('CONAN_MAKE_PROGRAM')
+                    make = str(env_make) if env_make and "make" in str(
+                        env_make) else "make.exe" if self.is_windows_host else "make"
+                    os.environ['CONAN_MAKE_PROGRAM'] = make
+
+                env_build = AutoToolsBuildEnvironment(self, win_bash=self.is_windows_host)
                 # ffmpeg's configure is not actually from autotools, so it doesn't understand standard options like
                 # --host, --build, --target
                 env_build.configure(args=args, build=False, host=False, target=False,
@@ -394,7 +399,7 @@ class FFmpegConan(ConanFile):
         if self.options.postproc:
             libs.append('postproc')
         if self.options.avdevice:
-            libs.append('avdevice')		
+            libs.append('avdevice')
         if self.is_msvc:
             if self.options.shared:
                 self.cpp_info.libs = libs

@@ -13,6 +13,7 @@ class TestPackageConan(ConanFile):
         cmake = CMake(self)
 
         cmake.definitions['WITH_POSTPROC'] = self.options['ffmpeg'].postproc
+        cmake.definitions['WITH_AVDEVICE'] = self.options['ffmpeg'].avdevice
         cmake.definitions['WITH_OPENJPEG'] = self.options['ffmpeg'].openjpeg
         cmake.definitions['WITH_OPENH264'] = self.options['ffmpeg'].openh264
         cmake.definitions['WITH_FREETYPE'] = self.options['ffmpeg'].freetype

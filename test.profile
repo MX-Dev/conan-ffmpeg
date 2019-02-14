@@ -10,19 +10,20 @@ arch=armv7
 build_type=Debug
 
 [options]
-vorbis=False
-lzma=False
-opus=False
-zmq=False
-iconv=False
-openjpeg=False
-openh264=False
-x264=False
-x265=False
-postproc=False
-avdevice=False
-freetype=False
-vpx=False
-mp3lame=False
-qsv=False
-fdk_aac=False
+ffmpeg:vorbis=False
+ffmpeg:lzma=False
+ffmpeg:opus=False
+ffmpeg:zmq=False
+ffmpeg:iconv=False
+ffmpeg:openjpeg=False
+ffmpeg:openh264=False
+ffmpeg:x264=False
+ffmpeg:x265=False
+ffmpeg:postproc=False
+ffmpeg:freetype=False
+ffmpeg:vpx=False
+ffmpeg:mp3lame=False
+ffmpeg:fdk_aac=False
+
+[build_requires]
+*: android-ndk/r19@magix/testing

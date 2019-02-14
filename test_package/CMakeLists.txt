@@ -19,6 +19,7 @@ function(add_option option)
 endfunction()
 
 add_option(WITH_POSTPROC)
+add_option(WITH_AVDEVICE)
 add_option(WITH_OPENJPEG)
 add_option(WITH_OPENH264)
 add_option(WITH_FREETYPE)
