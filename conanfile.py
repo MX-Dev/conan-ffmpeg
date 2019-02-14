@@ -320,7 +320,14 @@ class FFmpegConan(ConanFile):
             if self.is_android_cross:
                 args.extend(['--target-os=android',
                              '--enable-cross-compile',
-                             '--enable-jni'])
+                             '--enable-jni',
+                             '--disable-symver',
+                             '--disable-inline-asm'])
+                if self.settings.arch == "armv7":
+                    args.append('--cpu=armv7-a')
+                elif self.settings.arch == "armv8":
+                    args.append('--cpu=cortex-a8')
+
             # FIXME disable CUDA and CUVID by default, revisit later
 
             args.extend(['--disable-cuda', '--disable-cuvid'])
