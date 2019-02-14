@@ -46,9 +46,6 @@ class TestPackageConan(ConanFile):
         if self.settings.os == "Windows":
             cmake.definitions['WITH_QSV'] = self.options['ffmpeg'].qsv
 
-        if self.settings.os == "Android":
-            cmake.definitions['mediacodec'] = self.options['ffmpeg'].mediacodec
-
         cmake.configure()
         cmake.build()
 

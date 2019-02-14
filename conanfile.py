@@ -265,6 +265,7 @@ class FFmpegConan(ConanFile):
                             .get(str(self.settings.arch), str(self.settings.arch)))
 
             args.append('--enable-postproc' if self.options.postproc else '--disable-postproc')
+            args.append('--enable-avdevice' if self.options.postproc else '--disable-avdevice')
             args.append('--enable-pic' if self.options.fPIC else '--disable-pic')
             args.append('--enable-zlib' if self.options.zlib else '--disable-zlib')
             args.append('--enable-bzlib' if self.options.bzlib else '--disable-bzlib')
@@ -323,6 +324,22 @@ class FFmpegConan(ConanFile):
                              '--enable-jni',
                              '--disable-symver',
                              '--disable-inline-asm'])
+                if os.getenv("CC"):
+                    args.append("--cc=%s" % os.getenv("CC"))
+                if os.getenv("CXX"):
+                    args.append("--cxx=%s" % os.getenv("CXX"))
+                if os.getenv("CCAS"):
+                    args.append("--as=%s" % os.getenv("CCAS"))
+                if os.getenv("AR"):
+                    args.append("--ar=%s" % os.getenv("AR"))
+                if os.getenv("LD"):
+                    args.append("--ld=%s" % os.getenv("LD"))
+                if os.getenv("STRIP"):
+                    args.append("--strip=%s" % os.getenv("STRIP"))
+                if os.getenv("NM"):
+                    args.append("--nm=%s" % os.getenv("NM"))
+                if os.getenv("RANLIB"):
+                    args.append("--ranlib=%s" % os.getenv("RANLIB"))
                 if self.settings.arch == "armv7":
                     args.append('--cpu=armv7-a')
                 elif self.settings.arch == "armv8":

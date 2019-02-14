@@ -3,12 +3,14 @@ extern "C"
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavfilter/avfilter.h>
-#include <libavdevice/avdevice.h>
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 #include <libavutil/hwcontext.h>
 #ifdef WITH_POSTPROC
 #include <libpostproc/postprocess.h>
+#endif
+#ifdef WITH_AVDEVICE
+#include <libavdevice/avdevice.h>
 #endif
 }
 
@@ -136,7 +138,9 @@ int main() try
     avcodec_register_all();
     av_register_all();
     avfilter_register_all();
+#ifdef WITH_AVDEVICE
     avdevice_register_all();
+#endif
     swresample_version();
     swscale_version();
 #ifdef WITH_POSTPROC

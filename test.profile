@@ -20,6 +20,7 @@ ffmpeg:openh264=False
 ffmpeg:x264=False
 ffmpeg:x265=False
 ffmpeg:postproc=False
+ffmpeg:avdevice=False
 ffmpeg:freetype=False
 ffmpeg:vpx=False
 ffmpeg:mp3lame=False
