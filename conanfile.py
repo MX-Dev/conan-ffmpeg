@@ -22,7 +22,6 @@ class FFmpegConan(ConanFile):
                "fPIC": [True, False],
                "postproc": [True, False],
                "avdevice": [True, False],
-               "gif": [True, False],
                "zlib": [True, False],
                "bzlib": [True, False],
                "lzma": [True, False],
@@ -57,7 +56,6 @@ class FFmpegConan(ConanFile):
                        "fPIC=True",
                        "postproc=True",
                        "avdevice=True",
-                       "gif=True",
                        "zlib=True",
                        "bzlib=True",
                        "lzma=True",
@@ -284,10 +282,6 @@ class FFmpegConan(ConanFile):
             args.append('--enable-libmp3lame' if self.options.mp3lame else '--disable-libmp3lame')
             args.append('--enable-libfdk-aac' if self.options.fdk_aac else '--disable-libfdk-aac')
             args.append('--enable-libwebp' if self.options.webp else '--disable-libwebp')
-            args.append('--enable-mediacodec' if self.options.mediacodec else '--disable-mediacodec')
-
-            if self.options.gif:
-                args.extend(['--enable-encoder=gif', '--enable-muxer=gif'])
 
             if self.options.x264 or self.options.x265 or self.options.postproc:
                 args.append('--enable-gpl')
@@ -319,6 +313,7 @@ class FFmpegConan(ConanFile):
                 args.append('--enable-libmfx' if self.options.qsv else '--disable-libmfx')
 
             if self.is_android_cross:
+                args.append('--enable-mediacodec' if self.options.mediacodec else '--disable-mediacodec')
                 args.extend(['--target-os=android',
                              '--enable-cross-compile',
                              '--enable-jni',
@@ -342,8 +337,10 @@ class FFmpegConan(ConanFile):
                     args.append("--ranlib=%s" % os.getenv("RANLIB"))
                 if self.settings.arch == "armv7":
                     args.append('--cpu=armv7-a')
-                elif self.settings.arch == "armv8":
-                    args.append('--cpu=cortex-a8')
+
+                # fix neon builds, see http://lists.mplayerhq.hu/pipermail/ffmpeg-devel/2019-February/239921.html
+                if self.settings.arch == "armv8":
+                    args.append('--extra-cflags=-fno-integrated-as')
 
             # FIXME disable CUDA and CUVID by default, revisit later
 
