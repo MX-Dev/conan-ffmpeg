@@ -10,7 +10,6 @@ arch=armv7
 build_type=Debug
 
 [options]
-ffmpeg:vorbis=False
 ffmpeg:lzma=False
 ffmpeg:opus=False
 ffmpeg:zmq=False
@@ -25,6 +24,8 @@ ffmpeg:freetype=False
 ffmpeg:vpx=False
 ffmpeg:mp3lame=False
 ffmpeg:fdk_aac=False
+ffmpeg:mediacodec=False
+ffmpeg:jni=False
 
 [build_requires]
-*: android-ndk/r19@magix/testing
+*: android-ndk/r19b@magix/testing

@@ -51,6 +51,7 @@ class FFmpegConan(ConanFile):
                "videotoolbox": [True, False],
                "securetransport": [True, False],
                "qsv": [True, False],
+               "jni": [True, False],
                "mediacodec": [True, False]}
     default_options = ("shared=False",
                        "fPIC=True",
@@ -85,6 +86,7 @@ class FFmpegConan(ConanFile):
                        "videotoolbox=True",
                        "securetransport=True",
                        "qsv=True",
+                       "jni=True",
                        "mediacodec=True")
 
     @property
@@ -141,6 +143,7 @@ class FFmpegConan(ConanFile):
         if not self.is_windows_host or self.is_android_cross:
             self.options.remove("qsv")
         if not self.is_android_cross:
+            self.options.remove("jni")
             self.options.remove("mediacodec")
 
     def build_requirements(self):
@@ -314,9 +317,9 @@ class FFmpegConan(ConanFile):
 
             if self.is_android_cross:
                 args.append('--enable-mediacodec' if self.options.mediacodec else '--disable-mediacodec')
+                args.append('--enable-jni' if self.options.jni else '--disable-jni')
                 args.extend(['--target-os=android',
                              '--enable-cross-compile',
-                             '--enable-jni',
                              '--disable-symver',
                              '--disable-inline-asm'])
                 if os.getenv("CC"):
