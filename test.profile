@@ -24,6 +24,7 @@ ffmpeg:freetype=False
 ffmpeg:vpx=False
 ffmpeg:mp3lame=False
 ffmpeg:fdk_aac=False
+ffmpeg:webp=False
 ffmpeg:mediacodec=False
 ffmpeg:jni=False
 
