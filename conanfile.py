@@ -12,7 +12,7 @@ from conans import ConanFile, AutoToolsBuildEnvironment, tools
 # noinspection PyUnresolvedReferences
 class FFmpegConan(ConanFile):
     name = "ffmpeg"
-    version = "4.1"
+    version = "4.1.3"
     url = "https://github.com/MX-Dev/conan-ffmpeg"
     description = "A complete, cross-platform solution to record, convert and stream audio and video"
     license = "https://github.com/FFmpeg/FFmpeg/blob/master/LICENSE.md"
@@ -20,6 +20,16 @@ class FFmpegConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
     options = {"shared": [True, False],
                "fPIC": [True, False],
+               "disable_filters": [True, False],
+               "disable_bsfs": [True, False],
+               "disable_parsers": [True, False],
+               "disable_muxers": [True, False],
+               "disable_demuxers": [True, False],
+               "disable_protocols": [True, False],
+               "disable_encoders": [True, False],
+               "disable_decoders": [True, False],
+               "disable_devices": [True, False],
+               "disable_hwaccel": [True, False],
                "postproc": [True, False],
                "avdevice": [True, False],
                "zlib": [True, False],
@@ -55,39 +65,49 @@ class FFmpegConan(ConanFile):
                "mediacodec": [True, False]}
     default_options = ("shared=False",
                        "fPIC=True",
-                       "postproc=True",
-                       "avdevice=True",
-                       "zlib=True",
-                       "bzlib=True",
-                       "lzma=True",
-                       "iconv=True",
-                       "freetype=True",
-                       "openjpeg=True",
-                       "openh264=True",
-                       "opus=True",
-                       "vorbis=True",
+                       "disable_filters=False",
+                       "disable_bsfs=False",
+                       "disable_parsers=False",
+                       "disable_muxers=False",
+                       "disable_demuxers=False",
+                       "disable_protocols=False",
+                       "disable_encoders=False",
+                       "disable_decoders=False",
+                       "disable_devices=False",
+                       "disable_hwaccel=False",
+                       "postproc=False",
+                       "avdevice=False",
+                       "zlib=False",
+                       "bzlib=False",
+                       "lzma=False",
+                       "iconv=False",
+                       "freetype=False",
+                       "openjpeg=False",
+                       "openh264=False",
+                       "opus=False",
+                       "vorbis=False",
                        "zmq=False",
                        "sdl2=False",
-                       "x264=True",
-                       "x265=True",
-                       "vpx=True",
-                       "mp3lame=True",
-                       "fdk_aac=True",
-                       "webp=True",
-                       "alsa=True",
-                       "pulse=True",
-                       "vaapi=True",
-                       "vdpau=True",
-                       "xcb=True",
-                       "appkit=True",
-                       "avfoundation=True",
-                       "coreimage=True",
-                       "audiotoolbox=True",
-                       "videotoolbox=True",
-                       "securetransport=True",
-                       "qsv=True",
-                       "jni=True",
-                       "mediacodec=True")
+                       "x264=False",
+                       "x265=False",
+                       "vpx=False",
+                       "mp3lame=False",
+                       "fdk_aac=False",
+                       "webp=False",
+                       "alsa=False",
+                       "pulse=False",
+                       "vaapi=False",
+                       "vdpau=False",
+                       "xcb=False",
+                       "appkit=False",
+                       "avfoundation=False",
+                       "coreimage=False",
+                       "audiotoolbox=False",
+                       "videotoolbox=False",
+                       "securetransport=False",
+                       "qsv=False",
+                       "jni=False",
+                       "mediacodec=False")
 
     @property
     def is_windows_host(self):
@@ -115,7 +135,7 @@ class FFmpegConan(ConanFile):
 
     def source(self):
         git = tools.Git(folder="sources")
-        git.clone("https://github.com/MX-Dev/FFmpeg.git", "master")
+        git.clone("https://github.com/FFmpeg/FFmpeg.git", "release/4.1")
         if self.is_msvc and self.options.x264 and not self.options['x264'].shared:
             # suppress MSVC linker warnings: https://trac.ffmpeg.org/ticket/7396
             # warning LNK4049: locally defined symbol x264_levels imported
@@ -265,8 +285,29 @@ class FFmpegConan(ConanFile):
                 args.append('--arch=%s' % {"armv7": "arm", "armv8": "arm64"}
                             .get(str(self.settings.arch), str(self.settings.arch)))
 
+            if self.options.disable_filters:
+                args.append('--disable-filters')
+            if self.options.disable_bsfs:
+                args.append('--disable-bsfs')
+            if self.options.disable_parsers:
+                args.append('--disable-parsers')
+            if self.options.disable_muxers:
+                args.append('--disable-muxers')
+            if self.options.disable_demuxers:
+                args.append('--disable-demuxers')
+            if self.options.disable_protocols:
+                args.append('--disable-protocols')
+            if self.options.disable_encoders:
+                args.append('--disable-encoders')
+            if self.options.disable_decoders:
+                args.append('--disable-decoders')
+            if self.options.disable_devices:
+                args.append('--disable-devices')
+            if self.options.disable_hwaccel:
+                args.append('--disable-hwaccels')
+
             args.append('--enable-postproc' if self.options.postproc else '--disable-postproc')
-            args.append('--enable-avdevice' if self.options.postproc else '--disable-avdevice')
+            args.append('--enable-avdevice' if self.options.avdevice else '--disable-avdevice')
             args.append('--enable-pic' if self.options.fPIC else '--disable-pic')
             args.append('--enable-zlib' if self.options.zlib else '--disable-zlib')
             args.append('--enable-bzlib' if self.options.bzlib else '--disable-bzlib')
