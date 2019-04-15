@@ -382,9 +382,13 @@ class FFmpegConan(ConanFile):
                 if self.settings.arch == "armv7":
                     args.append('--cpu=armv7-a')
 
+                extra_cflags = [os.getenv("CFLAGS") if os.getenv("CFLAGS") else ""]
+
                 # fix neon builds, see http://lists.mplayerhq.hu/pipermail/ffmpeg-devel/2019-February/239921.html
                 if self.settings.arch == "armv8":
-                    args.append('--extra-cflags=-fno-integrated-as')
+                    extra_cflags.append('-fno-integrated-as')
+
+                args.append("--extra-cflags=%s" % " ".join(extra_cflags))
 
             # FIXME disable CUDA and CUVID by default, revisit later
 
