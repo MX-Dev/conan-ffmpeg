@@ -12,10 +12,16 @@ from conans import ConanFile, AutoToolsBuildEnvironment, tools
 # noinspection PyUnresolvedReferences
 class FFmpegConan(ConanFile):
     name = "ffmpeg"
-    version = "4.1.3"
+    version = "4.1.3.1"
     url = "https://github.com/MX-Dev/conan-ffmpeg"
     description = "A complete, cross-platform solution to record, convert and stream audio and video"
-    license = "https://github.com/FFmpeg/FFmpeg/blob/master/LICENSE.md"
+    # https://github.com/FFmpeg/FFmpeg/blob/master/LICENSE.md
+    license = "LGPL-2.1-or-later", "GPL-2.0-or-later"
+    homepage = "https://ffmpeg.org/"
+    author = "Bincrafters <bincrafters@gmail.com>"
+    topics = "ffmpeg", "multimedia", "audio", "video", "encoder", "decoder", "encoding", "decoding",\
+             "transcoding", "multiplexer", "demultiplexer", "streaming"
+    _source_subfolder = "sources"
     exports_sources = ["LICENSE"]
     settings = "os", "arch", "compiler", "build_type"
     options = {"shared": [True, False],
@@ -49,6 +55,7 @@ class FFmpegConan(ConanFile):
                "mp3lame": [True, False],
                "fdk_aac": [True, False],
                "webp": [True, False],
+               "openssl": [True, False],
                "alsa": [True, False],
                "pulse": [True, False],
                "vaapi": [True, False],
@@ -84,6 +91,7 @@ class FFmpegConan(ConanFile):
                        "freetype=False",
                        "openjpeg=False",
                        "openh264=False",
+                       "openssl=False",
                        "opus=False",
                        "vorbis=False",
                        "zmq=False",
@@ -134,19 +142,14 @@ class FFmpegConan(ConanFile):
         return self.settings.os == 'Android' and self.settings.compiler == 'clang'
 
     def source(self):
-        git = tools.Git(folder="sources")
+        git = tools.Git(folder=self._source_subfolder)
         git.clone("https://github.com/FFmpeg/FFmpeg.git", "release/4.1")
-        if self.is_msvc and self.options.x264 and not self.options['x264'].shared:
-            # suppress MSVC linker warnings: https://trac.ffmpeg.org/ticket/7396
-            # warning LNK4049: locally defined symbol x264_levels imported
-            # warning LNK4049: locally defined symbol x264_bit_depth imported
-            tools.replace_in_file(os.path.join('sources', 'libavcodec', 'libx264.c'),
-                                  '#define X264_API_IMPORTS 1', '')
-
     def configure(self):
         del self.settings.compiler.libcxx
 
     def config_options(self):
+        if self.settings.os == "Windows":
+            del self.options.fPIC
         if not self.is_linux_host or self.is_android_cross:
             self.options.remove("vaapi")
             self.options.remove("vdpau")
@@ -206,6 +209,8 @@ class FFmpegConan(ConanFile):
             self.requires.add("libfdk_aac/0.1.5@bincrafters/stable")
         if self.options.webp:
             self.requires.add("libwebp/1.0.0@bincrafters/stable")
+        if self.options.openssl:
+            self.requires.add("OpenSSL/1.1.1b@conan/stable")
         if self.is_windows_host and not self.is_android_cross:
             if self.options.qsv:
                 self.requires.add("intel_media_sdk/2018R2@bincrafters/stable")
@@ -237,7 +242,7 @@ class FFmpegConan(ConanFile):
                 for package in packages:
                     installer.install(package)
 
-    def copy_pkg_config(self, name):
+    def _copy_pkg_config(self, name):
         root = self.deps_cpp_info[name].rootpath
         pc_dir = os.path.join(root, 'lib', 'pkgconfig')
         pc_files = glob.glob('%s/*.pc' % pc_dir)
@@ -248,7 +253,22 @@ class FFmpegConan(ConanFile):
             prefix = tools.unix_path(root) if self.is_windows_host else root
             tools.replace_prefix_in_pc_file(new_pc, prefix)
 
+    def _patch_sources(self):
+        if self.is_msvc and self.options.x264 and not self.options['x264'].shared:
+            # suppress MSVC linker warnings: https://trac.ffmpeg.org/ticket/7396
+            # warning LNK4049: locally defined symbol x264_levels imported
+            # warning LNK4049: locally defined symbol x264_bit_depth imported
+            tools.replace_in_file(os.path.join(self._source_subfolder, 'libavcodec', 'libx264.c'),
+                                  '#define X264_API_IMPORTS 1', '')
+        if self.options.openssl:
+            # https://trac.ffmpeg.org/ticket/5675
+            openssl_libraries = ' '.join(['-l%s' % lib for lib in self.deps_cpp_info["OpenSSL"].libs])
+            tools.replace_in_file(os.path.join(self._source_subfolder, 'configure'),
+                                  'check_lib openssl openssl/ssl.h SSL_library_init -lssl -lcrypto -lws2_32 -lgdi32 ||',
+                                  'check_lib openssl openssl/ssl.h OPENSSL_init_ssl %s || ' % openssl_libraries)
+
     def build(self):
+        self._patch_sources()
         if self.is_windows_host:
             msys_bin = self.deps_env_info['msys2_installer'].MSYS_BIN
             with tools.environment_append({'PATH': [msys_bin],
@@ -262,7 +282,7 @@ class FFmpegConan(ConanFile):
             self.build_configure()
 
     def build_configure(self):
-        with tools.chdir('sources'):
+        with tools.chdir(self._source_subfolder):
             prefix = tools.unix_path(self.package_folder) if self.is_windows_host else self.package_folder
             args = ['--prefix=%s' % prefix,
                     '--disable-doc',
@@ -285,6 +305,8 @@ class FFmpegConan(ConanFile):
                 args.append('--arch=%s' % {"armv7": "arm", "armv8": "arm64"}
                             .get(str(self.settings.arch), str(self.settings.arch)))
 
+            if self.settings.os != "Windows":
+                args.append('--enable-pic' if self.options.fPIC else '--disable-pic')
             if self.options.disable_filters:
                 args.append('--disable-filters')
             if self.options.disable_bsfs:
@@ -308,7 +330,6 @@ class FFmpegConan(ConanFile):
 
             args.append('--enable-postproc' if self.options.postproc else '--disable-postproc')
             args.append('--enable-avdevice' if self.options.avdevice else '--disable-avdevice')
-            args.append('--enable-pic' if self.options.fPIC else '--disable-pic')
             args.append('--enable-zlib' if self.options.zlib else '--disable-zlib')
             args.append('--enable-bzlib' if self.options.bzlib else '--disable-bzlib')
             args.append('--enable-lzma' if self.options.lzma else '--disable-lzma')
@@ -326,6 +347,7 @@ class FFmpegConan(ConanFile):
             args.append('--enable-libmp3lame' if self.options.mp3lame else '--disable-libmp3lame')
             args.append('--enable-libfdk-aac' if self.options.fdk_aac else '--disable-libfdk-aac')
             args.append('--enable-libwebp' if self.options.webp else '--disable-libwebp')
+            args.append('--enable-openssl' if self.options.openssl else '--disable-openssl')
 
             if self.options.x264 or self.options.x265 or self.options.postproc:
                 args.append('--enable-gpl')
@@ -396,31 +418,31 @@ class FFmpegConan(ConanFile):
 
             os.makedirs('pkgconfig')
             if self.options.freetype:
-                self.copy_pkg_config('freetype')
-                self.copy_pkg_config('libpng')
+                self._copy_pkg_config('freetype')
+                self._copy_pkg_config('libpng')
             if self.options.opus:
-                self.copy_pkg_config('opus')
+                self._copy_pkg_config('opus')
             if self.options.vorbis:
-                self.copy_pkg_config('ogg')
-                self.copy_pkg_config('vorbis')
+                self._copy_pkg_config('ogg')
+                self._copy_pkg_config('vorbis')
             if self.options.zmq:
-                self.copy_pkg_config('zmq')
+                self._copy_pkg_config('zmq')
             if self.options.sdl2:
-                self.copy_pkg_config('sdl2')
+                self._copy_pkg_config('sdl2')
             if self.options.x264:
-                self.copy_pkg_config('libx264')
+                self._copy_pkg_config('libx264')
             if self.options.x265:
-                self.copy_pkg_config('libx265')
+                self._copy_pkg_config('libx265')
             if self.options.vpx:
-                self.copy_pkg_config('libvpx')
+                self._copy_pkg_config('libvpx')
             if self.options.fdk_aac:
-                self.copy_pkg_config('libfdk_aac')
+                self._copy_pkg_config('libfdk_aac')
             if self.options.openh264:
-                self.copy_pkg_config('openh264')
+                self._copy_pkg_config('openh264')
             if self.options.openjpeg:
-                self.copy_pkg_config('openjpeg')
+                self._copy_pkg_config('openjpeg')
             if self.options.webp:
-                self.copy_pkg_config('libwebp')
+                self._copy_pkg_config('libwebp')
 
             pkg_config_path = os.path.abspath('pkgconfig')
             pkg_config_path = tools.unix_path(pkg_config_path) if self.is_windows_host else pkg_config_path
@@ -454,7 +476,7 @@ class FFmpegConan(ConanFile):
                         tools.run_in_windows_bash(self, 'rm -f ~/%s.bak' % filename)
 
     def package(self):
-        with tools.chdir("sources"):
+        with tools.chdir(self._source_subfolder):
             self.copy(pattern="LICENSE")
         if self.is_msvc and not self.options.shared:
             # ffmpeg produces .a files which are actually .lib files
@@ -506,7 +528,7 @@ class FFmpegConan(ConanFile):
                 self.cpp_info.libs.extend(['vdpau', 'X11'])
             if self.options.xcb:
                 self.cpp_info.libs.extend(['xcb', 'xcb-shm', 'xcb-shape', 'xcb-xfixes'])
-            if self.options.fPIC:
+            if self.settings.os != "Windows" and self.options.fPIC:
                 # https://trac.ffmpeg.org/ticket/1713
                 # https://ffmpeg.org/platform.html#Advanced-linking-configuration
                 # https://ffmpeg.org/pipermail/libav-user/2014-December/007719.html
