@@ -51,5 +51,9 @@ class TestPackageConan(ConanFile):
         cmake.build()
 
     def test(self):
+        if self.settings.os == "Android":
+            print("Executing tests for Android is not supported.")
+            return
+
         bin_path = os.path.join("bin", "test_package")
         self.run(bin_path, run_environment=True)

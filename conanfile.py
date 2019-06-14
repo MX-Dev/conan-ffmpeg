@@ -12,14 +12,14 @@ from conans import ConanFile, AutoToolsBuildEnvironment, tools
 # noinspection PyUnresolvedReferences
 class FFmpegConan(ConanFile):
     name = "ffmpeg"
-    version = "4.1.3.1"
+    version = "4.1.3"
     url = "https://github.com/MX-Dev/conan-ffmpeg"
     description = "A complete, cross-platform solution to record, convert and stream audio and video"
     # https://github.com/FFmpeg/FFmpeg/blob/master/LICENSE.md
     license = "LGPL-2.1-or-later", "GPL-2.0-or-later"
     homepage = "https://ffmpeg.org/"
     author = "Bincrafters <bincrafters@gmail.com>"
-    topics = "ffmpeg", "multimedia", "audio", "video", "encoder", "decoder", "encoding", "decoding",\
+    topics = "ffmpeg", "multimedia", "audio", "video", "encoder", "decoder", "encoding", "decoding", \
              "transcoding", "multiplexer", "demultiplexer", "streaming"
     _source_subfolder = "sources"
     exports_sources = ["LICENSE"]
@@ -38,6 +38,8 @@ class FFmpegConan(ConanFile):
                "disable_hwaccel": [True, False],
                "postproc": [True, False],
                "avdevice": [True, False],
+               "cuda": [True, False],
+               "cuvid": [True, False],
                "zlib": [True, False],
                "bzlib": [True, False],
                "lzma": [True, False],
@@ -84,6 +86,8 @@ class FFmpegConan(ConanFile):
                        "disable_hwaccel=False",
                        "postproc=False",
                        "avdevice=False",
+                       "cuda=False",
+                       "cuvid=False",
                        "zlib=False",
                        "bzlib=False",
                        "lzma=False",
@@ -114,8 +118,8 @@ class FFmpegConan(ConanFile):
                        "videotoolbox=False",
                        "securetransport=False",
                        "qsv=False",
-                       "jni=False",
-                       "mediacodec=False")
+                       "jni=True",
+                       "mediacodec=True")
 
     @property
     def is_windows_host(self):
@@ -144,6 +148,7 @@ class FFmpegConan(ConanFile):
     def source(self):
         git = tools.Git(folder=self._source_subfolder)
         git.clone("https://github.com/FFmpeg/FFmpeg.git", "release/4.1")
+
     def configure(self):
         del self.settings.compiler.libcxx
 
@@ -348,35 +353,14 @@ class FFmpegConan(ConanFile):
             args.append('--enable-libfdk-aac' if self.options.fdk_aac else '--disable-libfdk-aac')
             args.append('--enable-libwebp' if self.options.webp else '--disable-libwebp')
             args.append('--enable-openssl' if self.options.openssl else '--disable-openssl')
+            args.append('--enable-cuda' if self.options.cuda else '--disable-cuda')
+            args.append('--enable-cuvid' if self.options.cuvid else '--disable-cuvid')
 
             if self.options.x264 or self.options.x265 or self.options.postproc:
                 args.append('--enable-gpl')
 
             if self.options.fdk_aac:
                 args.append('--enable-nonfree')
-
-            if self.is_linux_host and not self.is_android_cross:
-                args.append('--enable-alsa' if self.options.alsa else '--disable-alsa')
-                args.append('--enable-libpulse' if self.options.pulse else '--disable-libpulse')
-                args.append('--enable-vaapi' if self.options.vaapi else '--disable-vaapi')
-                args.append('--enable-vdpau' if self.options.vdpau else '--disable-vdpau')
-                if self.options.xcb:
-                    args.extend(['--enable-libxcb', '--enable-libxcb-shm',
-                                 '--enable-libxcb-shape', '--enable-libxcb-xfixes'])
-                else:
-                    args.extend(['--disable-libxcb', '--disable-libxcb-shm',
-                                 '--disable-libxcb-shape', '--disable-libxcb-xfixes'])
-
-            if self.is_mac_host and not self.is_android_cross:
-                args.append('--enable-appkit' if self.options.appkit else '--disable-appkit')
-                args.append('--enable-avfoundation' if self.options.avfoundation else '--disable-avfoundation')
-                args.append('--enable-coreimage' if self.options.avfoundation else '--disable-coreimage')
-                args.append('--enable-audiotoolbox' if self.options.audiotoolbox else '--disable-audiotoolbox')
-                args.append('--enable-videotoolbox' if self.options.videotoolbox else '--disable-videotoolbox')
-                args.append('--enable-securetransport' if self.options.securetransport else '--disable-securetransport')
-
-            if self.is_windows_host and not self.is_android_cross:
-                args.append('--enable-libmfx' if self.options.qsv else '--disable-libmfx')
 
             if self.is_android_cross:
                 args.append('--enable-mediacodec' if self.options.mediacodec else '--disable-mediacodec')
@@ -404,17 +388,35 @@ class FFmpegConan(ConanFile):
                 if self.settings.arch == "armv7":
                     args.append('--cpu=armv7-a')
 
-                extra_cflags = [os.getenv("CFLAGS") if os.getenv("CFLAGS") else ""]
-
-                # fix neon builds, see http://lists.mplayerhq.hu/pipermail/ffmpeg-devel/2019-February/239921.html
-                if self.settings.arch == "armv8":
-                    extra_cflags.append('-fno-integrated-as')
+                extra_cflags = []
+                if os.getenv("CFLAGS"):
+                    extra_cflags.append(os.getenv("CFLAGS"))
 
                 args.append("--extra-cflags=%s" % " ".join(extra_cflags))
 
-            # FIXME disable CUDA and CUVID by default, revisit later
+            else:
+                if self.is_linux_host:
+                    args.append('--enable-alsa' if self.options.alsa else '--disable-alsa')
+                    args.append('--enable-libpulse' if self.options.pulse else '--disable-libpulse')
+                    args.append('--enable-vaapi' if self.options.vaapi else '--disable-vaapi')
+                    args.append('--enable-vdpau' if self.options.vdpau else '--disable-vdpau')
+                    if self.options.xcb:
+                        args.extend(['--enable-libxcb', '--enable-libxcb-shm',
+                                     '--enable-libxcb-shape', '--enable-libxcb-xfixes'])
+                    else:
+                        args.extend(['--disable-libxcb', '--disable-libxcb-shm',
+                                     '--disable-libxcb-shape', '--disable-libxcb-xfixes'])
 
-            args.extend(['--disable-cuda', '--disable-cuvid'])
+                if self.is_mac_host:
+                    args.append('--enable-appkit' if self.options.appkit else '--disable-appkit')
+                    args.append('--enable-avfoundation' if self.options.avfoundation else '--disable-avfoundation')
+                    args.append('--enable-coreimage' if self.options.avfoundation else '--disable-coreimage')
+                    args.append('--enable-audiotoolbox' if self.options.audiotoolbox else '--disable-audiotoolbox')
+                    args.append('--enable-videotoolbox' if self.options.videotoolbox else '--disable-videotoolbox')
+                    args.append('--enable-securetransport' if self.options.securetransport else '--disable-securetransport')
+
+                if self.is_windows_host:
+                    args.append('--enable-libmfx' if self.options.qsv else '--disable-libmfx')
 
             os.makedirs('pkgconfig')
             if self.options.freetype:
@@ -465,8 +467,7 @@ class FFmpegConan(ConanFile):
                 env_build = AutoToolsBuildEnvironment(self, win_bash=self.is_windows_host)
                 # ffmpeg's configure is not actually from autotools, so it doesn't understand standard options like
                 # --host, --build, --target
-                env_build.configure(args=args, build=False, host=False, target=False,
-                                    pkg_config_paths=[pkg_config_path])
+                env_build.configure(args=args, build=False, host=False, target=False, pkg_config_paths=[pkg_config_path])
                 env_build.make()
                 env_build.make(args=['install'])
             finally:
@@ -499,39 +500,42 @@ class FFmpegConan(ConanFile):
                 self.cpp_info.libs = ['lib' + lib for lib in libs]
         else:
             self.cpp_info.libs = libs
-        if self.is_mac_host and not self.is_android_cross:
-            frameworks = ['CoreVideo', 'CoreMedia', 'CoreGraphics', 'CoreFoundation', 'OpenGL', 'Foundation']
-            if self.options.appkit:
-                frameworks.append('AppKit')
-            if self.options.avfoundation:
-                frameworks.append('AVFoundation')
-            if self.options.coreimage:
-                frameworks.append('CoreImage')
-            if self.options.audiotoolbox:
-                frameworks.append('AudioToolbox')
-            if self.options.videotoolbox:
-                frameworks.append('VideoToolbox')
-            if self.options.securetransport:
-                frameworks.append('Security')
-            for framework in frameworks:
-                self.cpp_info.exelinkflags.append("-framework %s" % framework)
-            self.cpp_info.sharedlinkflags = self.cpp_info.exelinkflags
-        elif self.is_linux_host and not self.is_android_cross:
-            self.cpp_info.libs.extend(['dl', 'pthread'])
-            if self.options.alsa:
-                self.cpp_info.libs.append('asound')
-            if self.options.pulse:
-                self.cpp_info.libs.append('pulse')
-            if self.options.vaapi:
-                self.cpp_info.libs.extend(['va', 'va-drm', 'va-x11'])
-            if self.options.vdpau:
-                self.cpp_info.libs.extend(['vdpau', 'X11'])
-            if self.options.xcb:
-                self.cpp_info.libs.extend(['xcb', 'xcb-shm', 'xcb-shape', 'xcb-xfixes'])
-            if self.settings.os != "Windows" and self.options.fPIC:
-                # https://trac.ffmpeg.org/ticket/1713
-                # https://ffmpeg.org/platform.html#Advanced-linking-configuration
-                # https://ffmpeg.org/pipermail/libav-user/2014-December/007719.html
-                self.cpp_info.sharedlinkflags.append("-Wl,-Bsymbolic")
-        elif self.is_windows_host and not self.is_android_cross:
-            self.cpp_info.libs.extend(['ws2_32', 'secur32', 'shlwapi', 'strmiids', 'vfw32', 'bcrypt'])
+
+        if not self.is_android_cross:
+            if self.is_mac_host:
+                frameworks = ['CoreVideo', 'CoreMedia', 'CoreGraphics', 'CoreFoundation', 'OpenGL', 'Foundation']
+                if self.options.appkit:
+                    frameworks.append('AppKit')
+                if self.options.avfoundation:
+                    frameworks.append('AVFoundation')
+                if self.options.coreimage:
+                    frameworks.append('CoreImage')
+                if self.options.audiotoolbox:
+                    frameworks.append('AudioToolbox')
+                if self.options.videotoolbox:
+                    frameworks.append('VideoToolbox')
+                if self.options.securetransport:
+                    frameworks.append('Security')
+                for framework in frameworks:
+                    self.cpp_info.exelinkflags.append("-framework %s" % framework)
+                self.cpp_info.sharedlinkflags = self.cpp_info.exelinkflags
+            elif self.is_linux_host:
+                self.cpp_info.libs.extend(['dl', 'pthread'])
+                if self.options.alsa:
+                    self.cpp_info.libs.append('asound')
+                if self.options.pulse:
+                    self.cpp_info.libs.append('pulse')
+                if self.options.vaapi:
+                    self.cpp_info.libs.extend(['va', 'va-drm', 'va-x11'])
+                if self.options.vdpau:
+                    self.cpp_info.libs.extend(['vdpau', 'X11'])
+                if self.options.xcb:
+                    self.cpp_info.libs.extend(['xcb', 'xcb-shm', 'xcb-shape', 'xcb-xfixes'])
+            elif self.is_windows_host:
+                self.cpp_info.libs.extend(['ws2_32', 'secur32', 'shlwapi', 'strmiids', 'vfw32', 'bcrypt'])
+
+        if self.settings.os != "Windows" and self.options.fPIC:
+            # https://trac.ffmpeg.org/ticket/1713
+            # https://ffmpeg.org/platform.html#Advanced-linking-configuration
+            # https://ffmpeg.org/pipermail/libav-user/2014-December/007719.html
+            self.cpp_info.sharedlinkflags.append("-Wl,-Bsymbolic")
