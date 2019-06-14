@@ -122,27 +122,27 @@ class FFmpegConan(ConanFile):
                        "mediacodec=True")
 
     @property
-    def is_windows_host(self):
+    def _is_windows_host(self):
         return platform.system() == "Windows"
 
     @property
-    def is_linux_host(self):
+    def _is_linux_host(self):
         return platform.system() == "Linux"
 
     @property
-    def is_mac_host(self):
+    def _is_mac_host(self):
         return platform.system() == "Darwin"
 
     @property
-    def is_mingw_windows(self):
-        return self.is_windows_host and self.settings.compiler == 'gcc' and os.name == 'nt'
+    def _is_mingw_windows(self):
+        return self._is_windows_host and self.settings.compiler == 'gcc' and os.name == 'nt'
 
     @property
-    def is_msvc(self):
+    def _is_msvc(self):
         return self.settings.compiler == 'Visual Studio'
 
     @property
-    def is_android_cross(self):
+    def _is_android_cross(self):
         return self.settings.os == 'Android' and self.settings.compiler == 'clang'
 
     def source(self):
@@ -153,30 +153,35 @@ class FFmpegConan(ConanFile):
         del self.settings.compiler.libcxx
 
     def config_options(self):
+        if self._is_android_cross:
+            api_level = int(str(self.settings.os.api_level))
+            if api_level > 21:
+                raise Exception("Android builds require API Level <= 21")
+
         if self.settings.os == "Windows":
             del self.options.fPIC
-        if not self.is_linux_host or self.is_android_cross:
+        if not self._is_linux_host or self._is_android_cross:
             self.options.remove("vaapi")
             self.options.remove("vdpau")
             self.options.remove("xcb")
             self.options.remove("alsa")
             self.options.remove("pulse")
-        if not self.is_mac_host or self.is_android_cross:
+        if not self._is_mac_host or self._is_android_cross:
             self.options.remove("appkit")
             self.options.remove("avfoundation")
             self.options.remove("coreimage")
             self.options.remove("audiotoolbox")
             self.options.remove("videotoolbox")
             self.options.remove("securetransport")
-        if not self.is_windows_host or self.is_android_cross:
+        if not self._is_windows_host or self._is_android_cross:
             self.options.remove("qsv")
-        if not self.is_android_cross:
+        if not self._is_android_cross:
             self.options.remove("jni")
             self.options.remove("mediacodec")
 
     def build_requirements(self):
         self.build_requires("yasm_installer/1.3.0@bincrafters/stable")
-        if self.is_windows_host:
+        if self._is_windows_host:
             self.build_requires("msys2_installer/latest@bincrafters/stable")
 
     def requirements(self):
@@ -216,12 +221,12 @@ class FFmpegConan(ConanFile):
             self.requires.add("libwebp/1.0.0@bincrafters/stable")
         if self.options.openssl:
             self.requires.add("OpenSSL/1.1.1b@conan/stable")
-        if self.is_windows_host and not self.is_android_cross:
+        if self._is_windows_host and not self._is_android_cross:
             if self.options.qsv:
                 self.requires.add("intel_media_sdk/2018R2@bincrafters/stable")
 
     def system_requirements(self):
-        if self.is_linux_host and tools.os_info.is_linux and not self.is_android_cross:
+        if self._is_linux_host and tools.os_info.is_linux and not self._is_android_cross:
             if tools.os_info.with_apt:
                 installer = tools.SystemPackageTool()
                 arch_suffix = ''
@@ -255,11 +260,11 @@ class FFmpegConan(ConanFile):
             new_pc = os.path.join('pkgconfig', os.path.basename(pc_name))
             self.output.warn('copy .pc file %s' % os.path.basename(pc_name))
             shutil.copy(pc_name, new_pc)
-            prefix = tools.unix_path(root) if self.is_windows_host else root
+            prefix = tools.unix_path(root) if self._is_windows_host else root
             tools.replace_prefix_in_pc_file(new_pc, prefix)
 
     def _patch_sources(self):
-        if self.is_msvc and self.options.x264 and not self.options['x264'].shared:
+        if self._is_msvc and self.options.x264 and not self.options['x264'].shared:
             # suppress MSVC linker warnings: https://trac.ffmpeg.org/ticket/7396
             # warning LNK4049: locally defined symbol x264_levels imported
             # warning LNK4049: locally defined symbol x264_bit_depth imported
@@ -274,11 +279,11 @@ class FFmpegConan(ConanFile):
 
     def build(self):
         self._patch_sources()
-        if self.is_windows_host:
+        if self._is_windows_host:
             msys_bin = self.deps_env_info['msys2_installer'].MSYS_BIN
             with tools.environment_append({'PATH': [msys_bin],
                                            'CONAN_BASH_PATH': os.path.join(msys_bin, 'bash.exe')}):
-                if self.is_msvc:
+                if self._is_msvc:
                     with tools.vcvars(self.settings):
                         self.build_configure()
                 else:
@@ -288,7 +293,7 @@ class FFmpegConan(ConanFile):
 
     def build_configure(self):
         with tools.chdir(self._source_subfolder):
-            prefix = tools.unix_path(self.package_folder) if self.is_windows_host else self.package_folder
+            prefix = tools.unix_path(self.package_folder) if self._is_windows_host else self.package_folder
             args = ['--prefix=%s' % prefix,
                     '--disable-doc',
                     '--disable-programs']
@@ -299,14 +304,14 @@ class FFmpegConan(ConanFile):
             args.append('--pkg-config-flags=--static')
             if self.settings.build_type == 'Debug':
                 args.extend(['--disable-optimizations', '--disable-mmx', '--disable-stripping', '--enable-debug'])
-            if self.is_msvc:
+            if self._is_msvc:
                 args.append('--toolchain=msvc')
                 args.append('--extra-cflags=-%s' % self.settings.compiler.runtime)
                 if int(str(self.settings.compiler.version)) <= 12:
                     # Visual Studio 2013 (and earlier) doesn't support "inline" keyword for C (only for C++)
                     args.append('--extra-cflags=-Dinline=__inline' % self.settings.compiler.runtime)
 
-            if self.settings.arch == 'x86' or self.is_android_cross:
+            if self.settings.arch == 'x86' or self._is_android_cross:
                 args.append('--arch=%s' % {"armv7": "arm", "armv8": "arm64"}
                             .get(str(self.settings.arch), str(self.settings.arch)))
 
@@ -362,7 +367,7 @@ class FFmpegConan(ConanFile):
             if self.options.fdk_aac:
                 args.append('--enable-nonfree')
 
-            if self.is_android_cross:
+            if self._is_android_cross:
                 args.append('--enable-mediacodec' if self.options.mediacodec else '--disable-mediacodec')
                 args.append('--enable-jni' if self.options.jni else '--disable-jni')
                 args.extend(['--target-os=android',
@@ -395,7 +400,7 @@ class FFmpegConan(ConanFile):
                 args.append("--extra-cflags=%s" % " ".join(extra_cflags))
 
             else:
-                if self.is_linux_host:
+                if self._is_linux_host:
                     args.append('--enable-alsa' if self.options.alsa else '--disable-alsa')
                     args.append('--enable-libpulse' if self.options.pulse else '--disable-libpulse')
                     args.append('--enable-vaapi' if self.options.vaapi else '--disable-vaapi')
@@ -407,7 +412,7 @@ class FFmpegConan(ConanFile):
                         args.extend(['--disable-libxcb', '--disable-libxcb-shm',
                                      '--disable-libxcb-shape', '--disable-libxcb-xfixes'])
 
-                if self.is_mac_host:
+                if self._is_mac_host:
                     args.append('--enable-appkit' if self.options.appkit else '--disable-appkit')
                     args.append('--enable-avfoundation' if self.options.avfoundation else '--disable-avfoundation')
                     args.append('--enable-coreimage' if self.options.avfoundation else '--disable-coreimage')
@@ -415,7 +420,7 @@ class FFmpegConan(ConanFile):
                     args.append('--enable-videotoolbox' if self.options.videotoolbox else '--disable-videotoolbox')
                     args.append('--enable-securetransport' if self.options.securetransport else '--disable-securetransport')
 
-                if self.is_windows_host:
+                if self._is_windows_host:
                     args.append('--enable-libmfx' if self.options.qsv else '--disable-libmfx')
 
             os.makedirs('pkgconfig')
@@ -447,10 +452,10 @@ class FFmpegConan(ConanFile):
                 self._copy_pkg_config('libwebp')
 
             pkg_config_path = os.path.abspath('pkgconfig')
-            pkg_config_path = tools.unix_path(pkg_config_path) if self.is_windows_host else pkg_config_path
+            pkg_config_path = tools.unix_path(pkg_config_path) if self._is_windows_host else pkg_config_path
 
             try:
-                if self.is_windows_host:
+                if self._is_windows_host:
                     # hack for MSYS2 which doesn't inherit PKG_CONFIG_PATH
                     for filename in ['.bashrc', '.bash_profile', '.profile']:
                         tools.run_in_windows_bash(self, 'cp ~/%s ~/%s.bak' % (filename, filename))
@@ -458,20 +463,20 @@ class FFmpegConan(ConanFile):
                                   % (pkg_config_path, filename)
                         tools.run_in_windows_bash(self, command)
 
-                if self.is_android_cross:
+                if self._is_android_cross:
                     env_make = os.getenv('CONAN_MAKE_PROGRAM')
                     make = str(env_make) if env_make and "make" in str(
-                        env_make) else "make.exe" if self.is_windows_host else "make"
+                        env_make) else "make.exe" if self._is_windows_host else "make"
                     os.environ['CONAN_MAKE_PROGRAM'] = make
 
-                env_build = AutoToolsBuildEnvironment(self, win_bash=self.is_windows_host)
+                env_build = AutoToolsBuildEnvironment(self, win_bash=self._is_windows_host)
                 # ffmpeg's configure is not actually from autotools, so it doesn't understand standard options like
                 # --host, --build, --target
                 env_build.configure(args=args, build=False, host=False, target=False, pkg_config_paths=[pkg_config_path])
                 env_build.make()
                 env_build.make(args=['install'])
             finally:
-                if self.is_windows_host:
+                if self._is_windows_host:
                     for filename in ['.bashrc', '.bash_profile', '.profile']:
                         tools.run_in_windows_bash(self, 'cp ~/%s.bak ~/%s' % (filename, filename))
                         tools.run_in_windows_bash(self, 'rm -f ~/%s.bak' % filename)
@@ -479,7 +484,7 @@ class FFmpegConan(ConanFile):
     def package(self):
         with tools.chdir(self._source_subfolder):
             self.copy(pattern="LICENSE")
-        if self.is_msvc and not self.options.shared:
+        if self._is_msvc and not self.options.shared:
             # ffmpeg produces .a files which are actually .lib files
             with tools.chdir(os.path.join(self.package_folder, 'lib')):
                 libs = glob.glob('*.a')
@@ -492,7 +497,7 @@ class FFmpegConan(ConanFile):
             libs.append('postproc')
         if self.options.avdevice:
             libs.append('avdevice')
-        if self.is_msvc:
+        if self._is_msvc:
             if self.options.shared:
                 self.cpp_info.libs = libs
                 self.cpp_info.libdirs.append('bin')
@@ -501,8 +506,8 @@ class FFmpegConan(ConanFile):
         else:
             self.cpp_info.libs = libs
 
-        if not self.is_android_cross:
-            if self.is_mac_host:
+        if not self._is_android_cross:
+            if self._is_mac_host:
                 frameworks = ['CoreVideo', 'CoreMedia', 'CoreGraphics', 'CoreFoundation', 'OpenGL', 'Foundation']
                 if self.options.appkit:
                     frameworks.append('AppKit')
@@ -519,7 +524,7 @@ class FFmpegConan(ConanFile):
                 for framework in frameworks:
                     self.cpp_info.exelinkflags.append("-framework %s" % framework)
                 self.cpp_info.sharedlinkflags = self.cpp_info.exelinkflags
-            elif self.is_linux_host:
+            elif self._is_linux_host:
                 self.cpp_info.libs.extend(['dl', 'pthread'])
                 if self.options.alsa:
                     self.cpp_info.libs.append('asound')
@@ -531,7 +536,7 @@ class FFmpegConan(ConanFile):
                     self.cpp_info.libs.extend(['vdpau', 'X11'])
                 if self.options.xcb:
                     self.cpp_info.libs.extend(['xcb', 'xcb-shm', 'xcb-shape', 'xcb-xfixes'])
-            elif self.is_windows_host:
+            elif self._is_windows_host:
                 self.cpp_info.libs.extend(['ws2_32', 'secur32', 'shlwapi', 'strmiids', 'vfw32', 'bcrypt'])
 
         if self.settings.os != "Windows" and self.options.fPIC:
