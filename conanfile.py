@@ -372,8 +372,8 @@ class FFmpegConan(ConanFile):
                 args.append('--enable-jni' if self.options.jni else '--disable-jni')
                 args.extend(['--target-os=android',
                              '--enable-cross-compile',
-                             '--disable-symver',
-                             '--disable-inline-asm'])
+                             '--disable-symver'])
+
                 if os.getenv("CC"):
                     args.append("--cc=%s" % os.getenv("CC"))
                 if os.getenv("CXX"):
@@ -391,7 +391,10 @@ class FFmpegConan(ConanFile):
                 if os.getenv("RANLIB"):
                     args.append("--ranlib=%s" % os.getenv("RANLIB"))
                 if self.settings.arch == "armv7":
-                    args.append('--cpu=armv7-a')
+                    args.extend(['--cpu=armv7-a', '--disable-inline-asm'])
+                # text segment is not shareable
+                if self.settings.arch == "x86":
+                    args.append('--disable-asm')
 
                 extra_cflags = []
                 if os.getenv("CFLAGS"):
