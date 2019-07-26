@@ -12,7 +12,7 @@ from conans import ConanFile, AutoToolsBuildEnvironment, tools
 # noinspection PyUnresolvedReferences
 class FFmpegConan(ConanFile):
     name = "ffmpeg"
-    version = "4.1.3"
+    version = "4.1.4"
     url = "https://github.com/MX-Dev/conan-ffmpeg"
     description = "A complete, cross-platform solution to record, convert and stream audio and video"
     # https://github.com/FFmpeg/FFmpeg/blob/master/LICENSE.md
