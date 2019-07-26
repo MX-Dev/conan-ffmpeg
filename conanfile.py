@@ -226,31 +226,32 @@ class FFmpegConan(ConanFile):
                 self.requires.add("intel_media_sdk/2018R2@bincrafters/stable")
 
     def system_requirements(self):
-        if self._is_linux_host and tools.os_info.is_linux and not self._is_android_cross:
-            if tools.os_info.with_apt:
-                installer = tools.SystemPackageTool()
-                arch_suffix = ''
-                if self.settings.arch == "x86":
-                    arch_suffix = ':i386'
-                elif self.settings.arch == "x86_64":
-                    arch_suffix = ':amd64'
+        if self.options.alsa or self.options.pulse or self.options.vaapi or self.options.vdpau or self.options.xcb:
+            if self._is_linux_host and tools.os_info.is_linux and not self._is_android_cross:
+                if tools.os_info.with_apt:
+                    installer = tools.SystemPackageTool()
+                    arch_suffix = ''
+                    if self.settings.arch == "x86":
+                        arch_suffix = ':i386'
+                    elif self.settings.arch == "x86_64":
+                        arch_suffix = ':amd64'
 
-                packages = ['pkg-config']
-                if self.options.alsa:
-                    packages.append('libasound2-dev%s' % arch_suffix)
-                if self.options.pulse:
-                    packages.append('libpulse-dev%s' % arch_suffix)
-                if self.options.vaapi:
-                    packages.append('libva-dev%s' % arch_suffix)
-                if self.options.vdpau:
-                    packages.append('libvdpau-dev%s' % arch_suffix)
-                if self.options.xcb:
-                    packages.extend(['libxcb1-dev%s' % arch_suffix,
-                                     'libxcb-shm0-dev%s' % arch_suffix,
-                                     'libxcb-shape0-dev%s' % arch_suffix,
-                                     'libxcb-xfixes0-dev%s' % arch_suffix])
-                for package in packages:
-                    installer.install(package)
+                    packages = ['pkg-config']
+                    if self.options.alsa:
+                        packages.append('libasound2-dev%s' % arch_suffix)
+                    if self.options.pulse:
+                        packages.append('libpulse-dev%s' % arch_suffix)
+                    if self.options.vaapi:
+                        packages.append('libva-dev%s' % arch_suffix)
+                    if self.options.vdpau:
+                        packages.append('libvdpau-dev%s' % arch_suffix)
+                    if self.options.xcb:
+                        packages.extend(['libxcb1-dev%s' % arch_suffix,
+                                         'libxcb-shm0-dev%s' % arch_suffix,
+                                         'libxcb-shape0-dev%s' % arch_suffix,
+                                         'libxcb-xfixes0-dev%s' % arch_suffix])
+                    for package in packages:
+                        installer.install(package)
 
     def _copy_pkg_config(self, name):
         root = self.deps_cpp_info[name].rootpath
