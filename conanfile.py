@@ -226,8 +226,8 @@ class FFmpegConan(ConanFile):
                 self.requires.add("intel_media_sdk/2018R2@bincrafters/stable")
 
     def system_requirements(self):
-        if self.options.alsa or self.options.pulse or self.options.vaapi or self.options.vdpau or self.options.xcb:
-            if self._is_linux_host and tools.os_info.is_linux and not self._is_android_cross:
+        if self._is_linux_host and tools.os_info.is_linux and not self._is_android_cross:
+            if self.options.alsa or self.options.pulse or self.options.vaapi or self.options.vdpau or self.options.xcb:
                 if tools.os_info.with_apt:
                     installer = tools.SystemPackageTool()
                     arch_suffix = ''
