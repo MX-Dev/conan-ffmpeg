@@ -9,10 +9,9 @@ import shutil
 from conans import ConanFile, AutoToolsBuildEnvironment, tools
 
 
-# noinspection PyUnresolvedReferences
 class FFmpegConan(ConanFile):
     name = "ffmpeg"
-    version = "4.1.4"
+    version = "4.1.6"
     url = "https://github.com/MX-Dev/conan-ffmpeg"
     description = "A complete, cross-platform solution to record, convert and stream audio and video"
     # https://github.com/FFmpeg/FFmpeg/blob/master/LICENSE.md
@@ -153,11 +152,6 @@ class FFmpegConan(ConanFile):
         del self.settings.compiler.libcxx
 
     def config_options(self):
-        if self._is_android_cross:
-            api_level = int(str(self.settings.os.api_level))
-            if api_level > 21:
-                raise Exception("Android builds require API Level <= 21")
-
         if self.settings.os == "Windows":
             del self.options.fPIC
         if not self._is_linux_host or self._is_android_cross:
@@ -543,7 +537,7 @@ class FFmpegConan(ConanFile):
             elif self._is_windows_host:
                 self.cpp_info.libs.extend(['ws2_32', 'secur32', 'shlwapi', 'strmiids', 'vfw32', 'bcrypt'])
 
-        if self.settings.os != "Windows" and self.options.fPIC:
+        if self._is_android_cross or self._is_linux_host and self.options.fPIC:
             # https://trac.ffmpeg.org/ticket/1713
             # https://ffmpeg.org/platform.html#Advanced-linking-configuration
             # https://ffmpeg.org/pipermail/libav-user/2014-December/007719.html
